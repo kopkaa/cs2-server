@@ -1,0 +1,23 @@
+# TEMPLATE - zkopíruj do terraform.tfvars a vyplň své hodnoty!
+# Nezapomeň přidat terraform.tfvars do .gitignore!
+
+# Získej Hetzner API token zde: https://console.hetzner.cloud/projects
+hcloud_token = "tvuj-hetzner-api-token-zde"
+
+# Cesta k tvému SSH klíči
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# Název serveru
+server_name = "cs-zombie-server"
+
+# Typ serveru:
+# cx11  - 1 vCPU, 2GB RAM  (~3.79€/měsíc)  - pro 5-10 hráčů
+# cx21  - 2 vCPU, 4GB RAM  (~5.83€/měsíc)  - pro 10-20 hráčů
+# cx31  - 2 vCPU, 8GB RAM  (~10.59€/měsíc) - pro 20-32 hráčů
+server_type = "cx21"
+
+# Lokace (nejblíž k ČR):
+# nbg1 - Norimberk, Německo
+# fsn1 - Falkenstein, Německo
+# hel1 - Helsinki, Finsko
+location = "nbg1"
