@@ -1,0 +1,172 @@
+---
+- name: Deploy Counter-Strike 2 Dedicated Server
+  hosts: cs_servers
+  become: yes
+
+  vars:
+    steam_user: "steam"
+    steam_home: "/home/{{ steam_user }}"
+    cs_install_dir: "{{ steam_home }}/cs2"
+    server_name: "My CS2 Server"
+    server_password: ""
+    rcon_password: "changeme"
+    sv_maxplayers: 12
+    server_port: 27015
+
+  tasks:
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install required packages
+      apt:
+        name:
+          - lib32gcc-s1
+          - lib32stdc++6
+          - lib32z1
+          - curl
+          - wget
+          - screen
+          - unzip
+          - tar
+          - net-tools
+        state: present
+
+    - name: Add i386 architecture for SteamCMD
+      command: dpkg --add-architecture i386
+      args:
+        creates: /var/lib/dpkg/arch
+
+    - name: Update package cache after adding i386
+      apt:
+        update_cache: yes
+
+    - name: Create steam user
+      user:
+        name: "{{ steam_user }}"
+        shell: /bin/bash
+        create_home: yes
+        home: "{{ steam_home }}"
+
+    - name: Download SteamCMD
+      get_url:
+        url: https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+        dest: "{{ steam_home }}/steamcmd_linux.tar.gz"
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+
+    - name: Create SteamCMD directory
+      file:
+        path: "{{ steam_home }}/steamcmd"
+        state: directory
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+
+    - name: Extract SteamCMD
+      unarchive:
+        src: "{{ steam_home }}/steamcmd_linux.tar.gz"
+        dest: "{{ steam_home }}/steamcmd"
+        remote_src: yes
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+
+    - name: Install CS2 server via SteamCMD
+      become_user: "{{ steam_user }}"
+      shell: |
+        {{ steam_home }}/steamcmd/steamcmd.sh +force_install_dir {{ cs_install_dir }} +login anonymous +app_update 730 validate +quit
+      args:
+        creates: "{{ cs_install_dir }}/game"
+
+    - name: Create config directory
+      file:
+        path: "{{ cs_install_dir }}/game/csgo/cfg"
+        state: directory
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+
+    - name: Copy server configuration
+      copy:
+        src: files/server.cfg
+        dest: "{{ cs_install_dir }}/game/csgo/cfg/server.cfg"
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+        mode: '0644'
+
+    - name: Copy game modes configuration
+      copy:
+        src: files/gamemodes_server.txt
+        dest: "{{ cs_install_dir }}/game/csgo/gamemodes_server.txt"
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+        mode: '0644'
+
+    - name: Download Metamod:Source
+      get_url:
+        url: https://mms.alliedmods.net/mmsdrop/2.0/mmsource-2.0.0-git1313-linux.tar.gz
+        dest: "{{ steam_home }}/metamod.tar.gz"
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+      ignore_errors: yes
+
+    - name: Install Metamod:Source
+      unarchive:
+        src: "{{ steam_home }}/metamod.tar.gz"
+        dest: "{{ cs_install_dir }}/game/csgo"
+        remote_src: yes
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+      ignore_errors: yes
+
+    - name: Create server startup script
+      copy:
+        dest: "{{ steam_home }}/start_cs2.sh"
+        content: |
+          #!/bin/bash
+          cd {{ cs_install_dir }}/game/bin/linuxsteamrt64
+
+          ./cs2 -dedicated \
+            +ip 0.0.0.0 \
+            +port {{ server_port }} \
+            +maxplayers {{ sv_maxplayers }} \
+            +map de_dust2 \
+            +game_type 0 \
+            +game_mode 0 \
+            +mapgroup mg_aim \
+            +exec server.cfg
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+        mode: '0755'
+
+    - name: Create systemd service
+      copy:
+        dest: /etc/systemd/system/cs2-server.service
+        content: |
+          [Unit]
+          Description=Counter-Strike 2 Dedicated Server
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ steam_user }}
+          WorkingDirectory={{ cs_install_dir }}/game/bin/linuxsteamrt64
+          ExecStartPre={{ steam_home }}/steamcmd/steamcmd.sh +force_install_dir {{ cs_install_dir }} +login anonymous +app_update 730 validate +quit
+          ExecStart={{ steam_home }}/start_cs2.sh
+          Restart=on-failure
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+      notify: Reload systemd
+
+    - name: Enable and start CS2 server
+      systemd:
+        name: cs2-server
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
