@@ -11,16 +11,14 @@ provider "hcloud" {
   token = var.hcloud_token
 }
 
-# SSH klíč pro přístup na server
+
 resource "hcloud_ssh_key" "default" {
   name       = "cs-server-key"
   public_key = file(var.ssh_public_key_path)
 }
 
-# Firewall pro CS server
 resource "hcloud_firewall" "cs_server" {
   name = "cs-server-firewall"
-
   # SSH
   rule {
     direction = "in"
@@ -32,7 +30,6 @@ resource "hcloud_firewall" "cs_server" {
     ]
   }
 
-  # CS 1.6 Game Server (27015)
   rule {
     direction = "in"
     protocol  = "udp"
@@ -43,7 +40,7 @@ resource "hcloud_firewall" "cs_server" {
     ]
   }
 
-  # RCON (remote console) - optional, můžeš zakomentovat
+  # RCON (remote console)
   rule {
     direction = "in"
     protocol  = "tcp"
@@ -54,19 +51,19 @@ resource "hcloud_firewall" "cs_server" {
     ]
   }
 
-  # HLTV (spectator) - optional
-  rule {
-    direction = "in"
-    protocol  = "udp"
-    port      = "27020"
-    source_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
+  # # HLTV (spectator) - optional
+  # rule {
+  #   direction = "in"
+  #   protocol  = "udp"
+  #   port      = "27020"
+  #   source_ips = [
+  #     "0.0.0.0/0",
+  #     "::/0"
+  #   ]
+  # }
 }
 
-# Vytvoření VPS serveru
+# VPS server
 resource "hcloud_server" "cs_server" {
   name        = var.server_name
   server_type = var.server_type
@@ -81,7 +78,6 @@ resource "hcloud_server" "cs_server" {
     game = "counter-strike"
   }
 
-  # Základní setup po vytvoření
   user_data = <<-EOF
     #cloud-config
     package_update: true
@@ -97,7 +93,6 @@ resource "hcloud_server" "cs_server" {
   EOF
 }
 
-# Čekání až bude server ready
 resource "null_resource" "wait_for_server" {
   depends_on = [hcloud_server.cs_server]
 
