@@ -18,6 +18,7 @@
       apt:
         update_cache: yes
         upgrade: dist
+      tags: [setup, system]
 
     - name: Install required packages
       apt:
@@ -32,15 +33,18 @@
           - tar
           - net-tools
         state: present
+      tags: [setup, system]
 
     - name: Add i386 architecture for SteamCMD
       command: dpkg --add-architecture i386
       args:
         creates: /var/lib/dpkg/arch
+      tags: [setup, system]
 
     - name: Update package cache after adding i386
       apt:
         update_cache: yes
+      tags: [setup, system]
 
     - name: Create steam user
       user:
@@ -48,6 +52,7 @@
         shell: /bin/bash
         create_home: yes
         home: "{{ steam_home }}"
+      tags: [setup, install]
 
     - name: Download SteamCMD
       get_url:
@@ -55,6 +60,7 @@
         dest: "{{ steam_home }}/steamcmd_linux.tar.gz"
         owner: "{{ steam_user }}"
         group: "{{ steam_user }}"
+      tags: [setup, install]
 
     - name: Create SteamCMD directory
       file:
@@ -62,6 +68,7 @@
         state: directory
         owner: "{{ steam_user }}"
         group: "{{ steam_user }}"
+      tags: [setup, install]
 
     - name: Extract SteamCMD
       unarchive:
@@ -70,6 +77,7 @@
         remote_src: yes
         owner: "{{ steam_user }}"
         group: "{{ steam_user }}"
+      tags: [setup, install]
 
     - name: Install CS2 server via SteamCMD
       become_user: "{{ steam_user }}"
@@ -77,13 +85,7 @@
         {{ steam_home }}/steamcmd/steamcmd.sh +force_install_dir {{ cs_install_dir }} +login anonymous +app_update 730 validate +quit
       args:
         creates: "{{ cs_install_dir }}/game"
-
-    - name: Create config directory
-      file:
-        path: "{{ cs_install_dir }}/game/csgo/cfg"
-        state: directory
-        owner: "{{ steam_user }}"
-        group: "{{ steam_user }}"
+      tags: [setup, install]
 
     - name: Copy server configuration
       copy:
@@ -92,6 +94,8 @@
         owner: "{{ steam_user }}"
         group: "{{ steam_user }}"
         mode: '0644'
+      tags: [config, server-config]
+      notify: Restart CS2 server
 
     - name: Copy game modes configuration
       copy:
@@ -100,43 +104,17 @@
         owner: "{{ steam_user }}"
         group: "{{ steam_user }}"
         mode: '0644'
+      tags: [config, maps]
+      notify: Restart CS2 server
 
-    - name: Download Metamod:Source
-      get_url:
-        url: https://mms.alliedmods.net/mmsdrop/2.0/mmsource-2.0.0-git1313-linux.tar.gz
-        dest: "{{ steam_home }}/metamod.tar.gz"
-        owner: "{{ steam_user }}"
-        group: "{{ steam_user }}"
-      ignore_errors: yes
-
-    - name: Install Metamod:Source
-      unarchive:
-        src: "{{ steam_home }}/metamod.tar.gz"
-        dest: "{{ cs_install_dir }}/game/csgo"
-        remote_src: yes
-        owner: "{{ steam_user }}"
-        group: "{{ steam_user }}"
-      ignore_errors: yes
-
-    - name: Create server startup script
+    - name: Copy server startup script
       copy:
+        src: files/start_cs2.sh
         dest: "{{ steam_home }}/start_cs2.sh"
-        content: |
-          #!/bin/bash
-          cd {{ cs_install_dir }}/game/bin/linuxsteamrt64
-
-          ./cs2 -dedicated \
-            +ip 0.0.0.0 \
-            +port {{ server_port }} \
-            +maxplayers {{ sv_maxplayers }} \
-            +map de_dust2 \
-            +game_type 0 \
-            +game_mode 0 \
-            +mapgroup mg_aim \
-            +exec server.cfg
         owner: "{{ steam_user }}"
         group: "{{ steam_user }}"
         mode: '0755'
+      tags: [setup, service, startup]
 
     - name: Create systemd service
       copy:
@@ -158,6 +136,7 @@
           [Install]
           WantedBy=multi-user.target
         mode: '0644'
+      tags: [setup, service]
       notify: Reload systemd
 
     - name: Enable and start CS2 server
@@ -165,8 +144,14 @@
         name: cs2-server
         enabled: yes
         state: started
+      tags: [setup, service]
 
   handlers:
     - name: Reload systemd
       systemd:
         daemon_reload: yes
+
+    - name: Restart CS2 server
+      systemd:
+        name: cs2-server
+        state: restarted
