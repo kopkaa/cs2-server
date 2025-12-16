@@ -107,6 +107,40 @@
       tags: [config, maps]
       notify: Restart CS2 server
 
+    - name: Download Metamod:Source for CS2
+      get_url:
+        url: https://mms.alliedmods.net/mmsdrop/2.0/mmsource-2.0.0-git1313-linux.tar.gz
+        dest: "{{ steam_home }}/metamod.tar.gz"
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+      tags: [plugins, metamod]
+
+    - name: Install Metamod:Source
+      unarchive:
+        src: "{{ steam_home }}/metamod.tar.gz"
+        dest: "{{ cs_install_dir }}/game/csgo"
+        remote_src: yes
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+      tags: [plugins, metamod]
+
+    - name: Download SourceMod for CS2
+      get_url:
+        url: https://sm.alliedmods.net/smdrop/2.0/sourcemod-2.0.0-git7218-linux.tar.gz
+        dest: "{{ steam_home }}/sourcemod.tar.gz"
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+      tags: [plugins, sourcemod]
+
+    - name: Install SourceMod
+      unarchive:
+        src: "{{ steam_home }}/sourcemod.tar.gz"
+        dest: "{{ cs_install_dir }}/game/csgo"
+        remote_src: yes
+        owner: "{{ steam_user }}"
+        group: "{{ steam_user }}"
+      tags: [plugins, sourcemod]
+
     - name: Copy server startup script
       copy:
         src: files/start_cs2.sh
